@@ -1,7 +1,7 @@
 {
   "name": "english-card",
   "version": "1.0.0",
-  "description": "每日英语单词卡片 — 纯静态学习网站，零构建，内置词表 + Free Dictionary API 运行时补全。",
+  "description": "每日英语单词卡片 — 纯静态学习网站，零构建，词表完全内置（构建期补全），运行时零联网。",
   "private": true,
   "scripts": {
     "build": "node scripts/build-words.js",

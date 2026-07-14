@@ -1,22 +1,27 @@
-/* 每日英语单词卡片 — front-end logic (vanilla JS, no build, no key) */
+/* 每日英语单词卡片 — front-end logic (vanilla JS, no build, no key, no runtime API).
+   所有单词数据均内置在 data/words.json / 每日快照中，前端只读本地 JSON，
+   绝不向云端发请求，加载快、可离线、永不空屏。 */
 (function () {
   "use strict";
 
-  const API = "https://api.dictionaryapi.dev/api/v2/entries/en/";
   const LS = { fav: "ec_fav", mastered: "ec_mastered", review: "ec_review", seen: "ec_seen" };
+  const LEVEL_LABEL = {
+    PRIMARY: "小学", JUNIOR: "初中", SENIOR: "高中",
+    CET4: "四级", CET6: "六级", KAOYAN: "考研", IELTS: "雅思",
+  };
 
   const state = {
     words: [],
+    byWord: {},
     manifest: null,
-    current: null,      // normalized current word
-    mode: "today",      // today | review | browse | history
+    current: null,
+    mode: "today",
     filterLevel: "ALL",
     filterText: "",
     reviewQueue: [],
     reviewPos: 0,
     browseList: [],
     browsePos: 0,
-    loading: false,
   };
 
   /* ---------- helpers ---------- */
@@ -26,12 +31,9 @@
     const z = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
   };
-  function dateIndex(dateStr, n) {
+  function dateIndex(s, n) {
     let h = 2166136261;
-    for (let i = 0; i < dateStr.length; i++) {
-      h ^= dateStr.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return (h >>> 0) % n;
   }
   async function loadJSON(url) {
@@ -39,9 +41,7 @@
       const r = await fetch(url + "?t=" + Date.now(), { cache: "no-store" });
       if (!r.ok) return null;
       return await r.json();
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
   function lsGet(key) {
     try { return JSON.parse(localStorage.getItem(key)) || []; } catch (e) { return []; }
@@ -49,6 +49,16 @@
   function lsSet(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
   }
+  function inSet(key, word) { return lsGet(key).includes(word); }
+  function toggleSet(key, word) {
+    const s = new Set(lsGet(key));
+    if (s.has(word)) s.delete(word); else s.add(word);
+    const arr = Array.from(s);
+    lsSet(key, arr);
+    return arr.includes(word);
+  }
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
   function normalize(w) {
     const examples = [];
     if (Array.isArray(w.examples) && w.examples.length) {
@@ -58,23 +68,18 @@
     }
     return {
       word: w.word || "",
+      level: w.level || "",
+      pos: w.pos || "",
       phonetic: w.phonetic || "",
       audio: w.audio || "",
-      pos: w.pos || "",
       cn: w.cn || "",
-      en: w.en || "",
-      level: w.level || "",
-      examples: examples,
+      en: w.en || w.cn || "",
+      examples,
+      synonyms: Array.isArray(w.synonyms) ? w.synonyms : [],
+      antonyms: Array.isArray(w.antonyms) ? w.antonyms : [],
+      usage: w.usage || "",
       _source: w._source || "builtin",
     };
-  }
-  function inSet(key, word) { return lsGet(key).includes(word); }
-  function toggleSet(key, word) {
-    const s = new Set(lsGet(key));
-    if (s.has(word)) s.delete(word); else s.add(word);
-    const arr = Array.from(s);
-    lsSet(key, arr);
-    return arr.includes(word);
   }
 
   /* ---------- pronunciation ---------- */
@@ -93,37 +98,7 @@
     speechFallback(word);
   }
 
-  /* ---------- live API enrichment (optional, silent fallback) ---------- */
-  async function enrich(word) {
-    try {
-      const c = new AbortController();
-      const t = setTimeout(() => c.abort(), 4000);
-      const r = await fetch(API + encodeURIComponent(word), { signal: c.signal });
-      clearTimeout(t);
-      if (!r.ok) return null;
-      const d = await r.json();
-      if (!Array.isArray(d) || !d.length) return null;
-      const entry = d[0];
-      const phs = entry.phonetics || [];
-      let audio = "", phonetic = entry.phonetic || "";
-      for (const p of phs) { if (p && p.audio && p.audio.startsWith("http")) { audio = p.audio; break; } }
-      if (!phonetic) for (const p of phs) if (p && p.text) { phonetic = p.text; break; }
-      const meanings = entry.meanings || [];
-      const pos = meanings.length ? meanings[0].partOfSpeech || "" : "";
-      let en = "", exampleEn = "";
-      for (const m of meanings) {
-        const defs = m.definitions || [];
-        if (!en && defs.length) en = defs[0].definition || "";
-        for (const df of defs) { if (!exampleEn && df.example) { exampleEn = df.example; break; } }
-        if (en && exampleEn) break;
-      }
-      return { phonetic, audio, pos, en, exampleEn };
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /* ---------- rendering ---------- */
+  /* ---------- status badges ---------- */
   function statusBadgesHTML(word) {
     let h = "";
     if (inSet(LS.fav, word)) h += '<span class="cbadge fav">★ 收藏</span>';
@@ -132,17 +107,40 @@
     return h;
   }
 
+  /* ---------- rendering ---------- */
   function renderCard() {
     const w = state.current;
     if (!w) return;
     $("wordText").textContent = w.word;
     $("phoneticText").textContent = w.phonetic || "（内置音标缺失，点击发音可用语音合成）";
-    $("levelTag").textContent = w.level || "—";
+    $("levelTag").textContent = LEVEL_LABEL[w.level] || w.level || "—";
+    $("summaryText").textContent = w.cn || w.en || "";
     $("posText").textContent = w.pos || "";
     $("cnText").textContent = w.cn || "";
     $("enText").textContent = w.en || "";
+    $("backExample").innerHTML = (w.examples && w.examples[0])
+      ? `<div class="e-en">${esc(w.examples[0].en)}</div>` + (w.examples[0].cn ? `<div class="e-cn">${esc(w.examples[0].cn)}</div>` : "")
+      : '<span class="tip">暂无例句</span>';
+    const bh = statusBadgesHTML(w.word);
+    $("cornerBadges").innerHTML = bh;
+    $("cornerBadgesBack").innerHTML = bh;
+    $("btnFav").classList.toggle("active", inSet(LS.fav, w.word));
+    $("btnMaster").classList.toggle("active", inSet(LS.mastered, w.word));
+    $("btnReview").classList.toggle("active", inSet(LS.review, w.word));
+    $("btnFav").textContent = inSet(LS.fav, w.word) ? "★ 已收藏" : "☆ 收藏";
+    $("btnMaster").textContent = inSet(LS.mastered, w.word) ? "✓ 已掌握" : "✓ 标记掌握";
+    $("btnReview").textContent = inSet(LS.review, w.word) ? "↺ 复习中" : "↺ 待复习";
+    $("card").classList.remove("flipped");
+  }
+
+  function renderDetail() {
+    const w = state.current;
+    if (!w) return;
+    $("dPos").textContent = w.pos || "—";
+    $("dCn").textContent = w.cn || "—";
+    $("dEn").textContent = w.en || "—";
     // examples
-    const box = $("examplesBox");
+    const box = $("dExamples");
     box.innerHTML = "";
     if (w.examples && w.examples.length) {
       w.examples.forEach((e) => {
@@ -153,27 +151,51 @@
         box.appendChild(div);
       });
     } else {
-      box.innerHTML = '<div class="hint">暂无例句</div>';
+      box.innerHTML = '<div class="tip">暂无例句</div>';
     }
-    // badges
-    const bh = statusBadgesHTML(w.word);
-    $("cornerBadges").innerHTML = bh;
-    $("cornerBadgesBack").innerHTML = bh;
-    // button states
-    $("btnFav").classList.toggle("active", inSet(LS.fav, w.word));
-    $("btnMaster").classList.toggle("active", inSet(LS.mastered, w.word));
-    $("btnReview").classList.toggle("active", inSet(LS.review, w.word));
-    $("btnFav").textContent = inSet(LS.fav, w.word) ? "★ 已收藏" : "☆ 收藏";
-    $("btnMaster").textContent = inSet(LS.mastered, w.word) ? "✓ 已掌握" : "✓ 标记掌握";
-    $("btnReview").textContent = inSet(LS.review, w.word) ? "↺ 复习中" : "↺ 待复习";
-    // reset flip
-    $("card").classList.remove("flipped");
+    // synonyms
+    const syn = $("dSyn");
+    syn.innerHTML = "";
+    if (w.synonyms && w.synonyms.length) {
+      w.synonyms.forEach((s) => {
+        const has = !!state.byWord[s.toLowerCase()];
+        const c = document.createElement("button");
+        c.className = "chip" + (has ? " has-word" : "");
+        c.textContent = s;
+        if (has) c.addEventListener("click", () => { showWord(state.byWord[s.toLowerCase()]); closeSidebar(); });
+        else c.addEventListener("click", () => speak(s, ""));
+        syn.appendChild(c);
+      });
+    } else syn.innerHTML = '<span class="chip empty-note">暂无同义词</span>';
+    // antonyms
+    const ant = $("dAnt");
+    ant.innerHTML = "";
+    if (w.antonyms && w.antonyms.length) {
+      w.antonyms.forEach((s) => {
+        const has = !!state.byWord[s.toLowerCase()];
+        const c = document.createElement("button");
+        c.className = "chip" + (has ? " has-word" : "");
+        c.textContent = s;
+        if (has) c.addEventListener("click", () => { showWord(state.byWord[s.toLowerCase()]); closeSidebar(); });
+        else c.addEventListener("click", () => speak(s, ""));
+        ant.appendChild(c);
+      });
+    } else ant.innerHTML = '<span class="chip empty-note">暂无反义词</span>';
+    // usage
+    const us = $("dUsage");
+    if (w.usage) {
+      us.innerHTML = esc(w.usage);
+    } else {
+      const lv = LEVEL_LABEL[w.level] || w.level || "";
+      us.innerHTML = `该词属于 <b>${esc(lv)}</b> 词表，词性 <b>${esc(w.pos || "—")}</b>。` +
+        `中文释义：${esc(w.cn || "—")}。建议结合上方例句体会实际用法。`;
+    }
   }
 
   function updateProgress() {
     const seen = lsGet(LS.seen);
     const map = {};
-    seen.forEach((d) => { map[d.date] = map[d.date] || new Set(); map[d.date].add(d.word); });
+    seen.forEach((d) => { (map[d.date] = map[d.date] || new Set()).add(d.word); });
     const today = todayStr();
     $("learnedCount").textContent = map[today] ? map[today].size : 0;
     $("masteredCount").textContent = lsGet(LS.mastered).length;
@@ -190,25 +212,11 @@
     updateProgress();
   }
 
-  async function showWord(raw, opts) {
-    opts = opts || {};
+  function showWord(raw) {
     state.current = normalize(raw);
     renderCard();
+    renderDetail();
     markSeen(state.current.word);
-    if (opts.enrich !== false) {
-      const e = await enrich(state.current.word);
-      if (e) {
-        state.current.phonetic = e.phonetic || state.current.phonetic;
-        state.current.audio = e.audio || state.current.audio;
-        state.current.pos = e.pos || state.current.pos;
-        state.current.en = e.en || state.current.en;
-        if (e.exampleEn) {
-          const base = state.current.examples[0] ? state.current.examples[0].cn : (raw.exampleCn || "");
-          state.current.examples = [{ en: e.exampleEn, cn: base }];
-        }
-        renderCard();
-      }
-    }
   }
 
   /* ---------- today's word ---------- */
@@ -226,7 +234,7 @@
       const idx = dateIndex(today, state.words.length);
       pick = state.words[idx];
     }
-    if (pick) await showWord(pick, { enrich: !!pick.audio ? false : true });
+    if (pick) showWord(pick);
   }
 
   function pickRandomDifferent() {
@@ -246,26 +254,24 @@
     if (state.filterLevel !== "ALL") arr = arr.filter((w) => w.level === state.filterLevel);
     if (state.filterText) {
       const q = state.filterText.toLowerCase();
-      arr = arr.filter((w) => w.word.toLowerCase().includes(q) || (w.cn || "").includes(state.filterText));
+      arr = arr.filter((w) => w.word.toLowerCase().includes(q) || (w.cn || "").toLowerCase().includes(q));
     }
     state.browseList = arr;
+    $("listMeta").textContent = `共 ${arr.length} 个单词`;
     if (!arr.length) { list.innerHTML = '<li class="hint">没有匹配的单词</li>'; return; }
     arr.forEach((w, i) => {
       const li = document.createElement("li");
       if (state.current && state.current.word === w.word) li.classList.add("active");
-      li.dataset.idx = i;
       let flags = "";
-      if (inSet(LS.fav, w.word)) flags += '<span title="收藏">★</span>';
-      if (inSet(LS.mastered, w.word)) flags += '<span title="已掌握" style="color:var(--mint)">✓</span>';
-      if (inSet(LS.review, w.word)) flags += '<span title="待复习" style="color:var(--rose)">↺</span>';
+      if (inSet(LS.fav, w.word)) flags += '<span class="fav" title="收藏">★</span>';
+      if (inSet(LS.mastered, w.word)) flags += '<span class="mastered" title="已掌握">✓</span>';
+      if (inSet(LS.review, w.word)) flags += '<span class="review" title="待复习">↺</span>';
       li.innerHTML =
-        `<div style="min-width:0"><div class="wl-word">${w.word}</div><div class="wl-cn">${w.cn || ""}</div></div>` +
-        `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span class="wl-tag">${w.level}</span><span class="wl-flags">${flags}</span></div>`;
-      li.addEventListener("click", () => {
-        state.browsePos = i;
-        showWord(w, { enrich: true });
-        closeSidebar();
-      });
+        `<div class="wl-main"><div class="wl-word">${esc(w.word)}<span class="wl-phon">${esc(w.phonetic)}</span></div>` +
+        `<div class="wl-cn">${esc(w.cn || "")}</div></div>` +
+        `<div class="wl-right"><span class="lv-badge">${esc(LEVEL_LABEL[w.level] || w.level)}</span>` +
+        `<span class="wl-flags">${flags}</span></div>`;
+      li.addEventListener("click", () => { showWord(w); closeSidebar(); });
       list.appendChild(li);
     });
   }
@@ -280,12 +286,13 @@
       list.innerHTML = '<li class="hint">还没有「待复习」的单词。在卡片上点「待复习」即可加入。</li>';
       return;
     }
-    state.reviewQueue.forEach((w, i) => {
+    state.reviewQueue.forEach((w) => {
       const li = document.createElement("li");
       li.innerHTML =
-        `<div style="min-width:0"><div class="wl-word">${w.word}</div><div class="wl-cn">${w.cn || ""}</div></div>` +
-        `<span class="wl-tag">${w.level}</span>`;
-      li.addEventListener("click", () => { state.reviewPos = i; showWord(w, { enrich: true }); closeSidebar(); });
+        `<div class="wl-main"><div class="wl-word">${esc(w.word)}<span class="wl-phon">${esc(w.phonetic)}</span></div>` +
+        `<div class="wl-cn">${esc(w.cn || "")}</div></div>` +
+        `<span class="lv-badge">${esc(LEVEL_LABEL[w.level] || w.level)}</span>`;
+      li.addEventListener("click", () => { showWord(w); closeSidebar(); });
       list.appendChild(li);
     });
   }
@@ -300,13 +307,16 @@
     const days = state.manifest.days.filter((d) => d.date !== todayStr()).slice(0, 30);
     if (!days.length) { list.innerHTML = '<li class="hint">暂无历史记录。</li>'; return; }
     for (const d of days) {
+      const snap = await loadJSON("./" + d.file);
+      const w = snap && snap.word ? snap.word : null;
       const li = document.createElement("li");
       li.innerHTML =
-        `<div style="min-width:0"><div class="wl-word">${d.word || ""}</div><div class="wl-cn">${d.date}</div></div>` +
-        `<span class="wl-tag">${d.level || ""}</span>`;
+        `<div class="wl-main"><div class="wl-word">${esc(d.word || "")}<span class="wl-phon">${esc(w ? w.phonetic : "")}</span></div>` +
+        `<div class="wl-cn">${esc(d.date)} · ${esc(w ? (w.cn || "") : "")}</div></div>` +
+        `<span class="lv-badge">${esc(LEVEL_LABEL[d.level] || d.level || "")}</span>`;
       li.addEventListener("click", async () => {
-        const snap = await loadJSON("./" + d.file);
-        if (snap && snap.word) { showWord(snap.word, { enrich: false }); closeSidebar(); }
+        const s = await loadJSON("./" + d.file);
+        if (s && s.word) { showWord(s.word); closeSidebar(); }
       });
       list.appendChild(li);
     }
@@ -318,28 +328,27 @@
     $("panelBrowse").classList.toggle("hidden", mode !== "browse");
     $("panelReview").classList.toggle("hidden", mode !== "review");
     $("panelHistory").classList.toggle("hidden", mode !== "history");
-    const titles = { browse: "词表浏览", review: "复习模式", history: "历史回看", today: "今日单词" };
-    $("sideTitle").textContent = titles[mode] || "词表浏览";
+    const titles = { browse: "词库浏览", review: "复习模式", history: "历史回看", today: "今日单词" };
+    $("sideTitle").textContent = titles[mode] || "词库浏览";
     if (mode === "browse") renderBrowse();
     if (mode === "review") renderReview();
     if (mode === "history") renderHistory();
     if (mode === "today") showToday();
   }
 
-  /* ---------- next ---------- */
   async function nextWord() {
     if (state.mode === "review" && state.reviewQueue.length) {
       state.reviewPos = (state.reviewPos + 1) % state.reviewQueue.length;
-      await showWord(state.reviewQueue[state.reviewPos], { enrich: true });
+      showWord(state.reviewQueue[state.reviewPos]);
       return;
     }
     if (state.mode === "browse" && state.browseList.length) {
       state.browsePos = (state.browsePos + 1) % state.browseList.length;
-      await showWord(state.browseList[state.browsePos], { enrich: true });
+      showWord(state.browseList[state.browsePos]);
       return;
     }
     const w = pickRandomDifferent();
-    if (w) await showWord(w, { enrich: true });
+    if (w) showWord(w);
   }
 
   /* ---------- sidebar open/close (mobile) ---------- */
@@ -352,25 +361,23 @@
       if (e.target.closest(".speak-btn")) return;
       $("card").classList.toggle("flipped");
     });
-    $("speakFront").addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (state.current) speak(state.current.word, state.current.audio);
-    });
+    $("speakFront").addEventListener("click", (e) => { e.stopPropagation(); if (state.current) speak(state.current.word, state.current.audio); });
+    $("speakBack").addEventListener("click", (e) => { e.stopPropagation(); if (state.current) speak(state.current.word, state.current.audio); });
     $("btnSpeak").addEventListener("click", () => { if (state.current) speak(state.current.word, state.current.audio); });
     $("btnFlip").addEventListener("click", () => $("card").classList.toggle("flipped"));
     $("btnNext").addEventListener("click", nextWord);
-    $("btnFav").addEventListener("click", () => { if (state.current) { toggleSet(LS.fav, state.current.word); renderCard(); } });
+    $("btnFav").addEventListener("click", () => { if (state.current) { toggleSet(LS.fav, state.current.word); renderCard(); renderDetail(); } });
     $("btnMaster").addEventListener("click", () => {
       if (!state.current) return;
       const on = toggleSet(LS.mastered, state.current.word);
-      if (on) toggleSet(LS.review, state.current.word); // mastered removes from review
-      renderCard(); updateProgress();
+      if (on) toggleSet(LS.review, state.current.word);
+      renderCard(); renderDetail(); updateProgress();
     });
     $("btnReview").addEventListener("click", () => {
       if (!state.current) return;
       const on = toggleSet(LS.review, state.current.word);
       if (on) toggleSet(LS.mastered, state.current.word);
-      renderCard(); updateProgress();
+      renderCard(); renderDetail(); updateProgress();
     });
 
     document.querySelectorAll(".mode-pill").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
@@ -387,8 +394,16 @@
     $("closeBtn").addEventListener("click", closeSidebar);
     $("scrim").addEventListener("click", closeSidebar);
     $("btnStartReview").addEventListener("click", () => {
-      if (state.reviewQueue.length) { state.reviewPos = 0; showWord(state.reviewQueue[0], { enrich: true }); closeSidebar(); }
+      if (state.reviewQueue.length) { state.reviewPos = 0; showWord(state.reviewQueue[0]); closeSidebar(); }
     });
+    document.querySelectorAll("#detailTabs .dtab").forEach((b) =>
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#detailTabs .dtab").forEach((x) => x.classList.remove("active"));
+        b.classList.add("active");
+        document.querySelectorAll(".dpanel").forEach((p) => p.classList.remove("active"));
+        $("tab-" + b.dataset.tab).classList.add("active");
+      })
+    );
   }
 
   /* ---------- init ---------- */
@@ -396,12 +411,15 @@
     bind();
     state.words = (await loadJSON("./data/words.json")) || [];
     state.manifest = (await loadJSON("./data/manifest.json")) || null;
+    state.byWord = {};
+    state.words.forEach((w) => { state.byWord[w.word.toLowerCase()] = w; });
     if (!state.words.length) {
       $("wordText").textContent = "词表加载失败";
       return;
     }
     updateProgress();
     await showToday();
+    renderBrowse(); // pre-populate the word library so the sidebar isn't empty on open
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

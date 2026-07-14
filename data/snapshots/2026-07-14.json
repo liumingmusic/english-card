@@ -1,24 +1,43 @@
 {
-  "generatedAt": "2026-07-14T14:48:06.441Z",
+  "generatedAt": "2026-07-14T15:10:34.377Z",
   "date": "2026-07-14",
   "word": {
-    "word": "boost",
-    "phonetic": "/buːst/",
-    "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/boost-au.mp3",
+    "word": "come",
+    "level": "PRIMARY",
     "pos": "noun",
-    "cn": "提升；推动",
-    "en": "A push from behind, as to one who is endeavoring to climb.",
-    "level": "CET4",
+    "phonetic": "/kʌm/",
+    "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/come-1-uk.mp3",
+    "cn": "来",
+    "en": "Coming, arrival; approach.",
     "examples": [
       {
-        "en": "The controversy gave a boost to the author's sales.",
-        "cn": "广告提升了销量。"
+        "en": "She’ll be coming ’round the mountain when she comes [...]",
+        "cn": "他明天会来。"
       },
       {
-        "en": "This campaign will boost your chances of winning the election.",
+        "en": "The pain in his leg comes and goes.",
+        "cn": ""
+      },
+      {
+        "en": "She came to think of that country as her home.",
+        "cn": ""
+      },
+      {
+        "en": "Could you tell me how the document came to be discovered?",
         "cn": ""
       }
-    ]
+    ],
+    "synonyms": [],
+    "antonyms": [
+      "depart",
+      "exit",
+      "flee",
+      "go",
+      "leave",
+      "retreat",
+      "withdraw"
+    ],
+    "usage": "反义词 go；过去式 came。"
   },
-  "source": "dictionaryapi+builtin"
+  "source": "builtin"
 }

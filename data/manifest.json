@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-07-14T14:48:06.443Z",
+  "updatedAt": "2026-07-14T15:10:34.377Z",
   "days": [
     {
       "date": "2026-07-14",
-      "word": "boost",
-      "level": "CET4",
+      "word": "come",
+      "level": "PRIMARY",
       "file": "data/snapshots/2026-07-14.json"
     }
   ]
