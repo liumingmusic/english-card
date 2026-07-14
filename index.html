@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#eef3ff" />
+  <title>每日英语单词卡片 · Daily Word</title>
+  <link rel="stylesheet" href="./assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">A</span>
+        <div class="brand-text">
+          <strong>每日单词</strong>
+          <small id="todayDate">—</small>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="today-badge" id="todayBadge">今日单词</span>
+        <div class="progress" title="学习进度">
+          <span>今日已学 <b id="learnedCount">0</b></span>
+          <span class="dot">·</span>
+          <span>已掌握 <b id="masteredCount">0</b></span>
+        </div>
+        <button class="icon-btn menu-btn" id="menuBtn" aria-label="菜单">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Card column -->
+    <section class="card-col">
+      <div class="card" id="card">
+        <div class="card-inner" id="cardInner">
+          <!-- front -->
+          <div class="face front">
+            <div class="corner-badges" id="cornerBadges"></div>
+            <div class="level-tag" id="levelTag">CET4</div>
+            <button class="speak-btn" id="speakFront" aria-label="发音">🔊</button>
+            <div class="word" id="wordText">loading…</div>
+            <div class="phonetic" id="phoneticText"></div>
+            <div class="flip-hint">轻触卡片翻面 ↻</div>
+          </div>
+          <!-- back -->
+          <div class="face back">
+            <div class="corner-badges" id="cornerBadgesBack"></div>
+            <div class="pos" id="posText"></div>
+            <div class="meanings">
+              <div class="cn" id="cnText"></div>
+              <div class="en" id="enText"></div>
+            </div>
+            <div class="examples" id="examplesBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="btnSpeak">🔊 发音</button>
+        <button class="btn" id="btnFlip">↻ 翻卡</button>
+        <button class="btn" id="btnNext">➡ 下一个</button>
+        <button class="btn btn-fav" id="btnFav">☆ 收藏</button>
+        <button class="btn btn-master" id="btnMaster">✓ 已掌握</button>
+        <button class="btn btn-review" id="btnReview">↺ 待复习</button>
+      </div>
+
+      <div class="modebar" id="modebar">
+        <button class="mode-pill active" data-mode="today" id="modeToday">今日</button>
+        <button class="mode-pill" data-mode="review" id="modeReview">复习模式</button>
+        <button class="mode-pill" data-mode="browse" id="modeBrowse">词表浏览</button>
+        <button class="mode-pill" data-mode="history" id="modeHistory">历史回看</button>
+      </div>
+    </section>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <h2 id="sideTitle">词表浏览</h2>
+        <button class="icon-btn close-btn" id="closeBtn" aria-label="关闭">✕</button>
+      </div>
+
+      <!-- browse panel -->
+      <div class="panel" id="panelBrowse">
+        <div class="filters">
+          <div class="levels" id="levelFilters">
+            <button class="lv active" data-level="ALL">全部</button>
+            <button class="lv" data-level="CET4">四级</button>
+            <button class="lv" data-level="CET6">六级</button>
+            <button class="lv" data-level="KAOYAN">考研</button>
+            <button class="lv" data-level="IELTS">雅思</button>
+          </div>
+          <input type="search" id="searchInput" placeholder="搜索单词…" />
+        </div>
+        <ul class="word-list" id="wordList"></ul>
+      </div>
+
+      <!-- review panel -->
+      <div class="panel hidden" id="panelReview">
+        <p class="hint">仅循环「待复习」的单词。点击即可开始复习。</p>
+        <div class="review-tools">
+          <button class="btn btn-primary" id="btnStartReview">开始复习</button>
+          <span id="reviewStat" class="hint"></span>
+        </div>
+        <ul class="word-list" id="reviewList"></ul>
+      </div>
+
+      <!-- history panel -->
+      <div class="panel hidden" id="panelHistory">
+        <p class="hint">过去几天的「今日单词」。</p>
+        <ul class="word-list" id="historyList"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <div class="scrim" id="scrim"></div>
+
+  <script src="./assets/js/app.js"></script>
+</body>
+</html>

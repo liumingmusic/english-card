@@ -1,0 +1,10 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Node (no build deps needed; this is a zero-build static site)
+node_modules/
+
+# local scratch
+.tmp/
