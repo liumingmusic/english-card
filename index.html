@@ -5,89 +5,163 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#eef3ff" />
   <link rel="icon" href="data:," />
-  <title>背单词 · Word Books</title>
+  <title>背单词 · 像百词斩一样刷词</title>
   <link rel="stylesheet" href="./assets/css/style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-inner">
+  <!-- ============ 屏幕 1：选单词本 ============ -->
+  <section id="screen-books" class="screen active">
+    <header class="books-top">
       <div class="brand">
         <span class="brand-mark">A</span>
         <div class="brand-text">
           <strong>背单词</strong>
-          <small>选单词本 · 浏览全部 · 逐个攻克</small>
+          <small>选一本单词本，开始刷词 📚</small>
         </div>
       </div>
-      <div class="topbar-right">
-        <div class="progress" title="学习进度">
-          <span>掌握 <b id="masteredCount">0</b></span>
-          <span class="dot">·</span>
-          <span>收藏 <b id="favCount">0</b></span>
+      <div class="progress-pill" title="学习进度">
+        <span>掌握 <b id="masteredCount">0</b></span>
+        <span class="dot">·</span>
+        <span>收藏 <b id="favCount">0</b></span>
+      </div>
+    </header>
+
+    <div class="books-head">
+      <h1>选择单词本</h1>
+      <p>点一本就开始背，一个一个过，像百词斩那样做选择题自测。</p>
+    </div>
+
+    <div class="book-grid" id="bookGrid"></div>
+
+    <div class="books-foot">
+      <button class="link-btn" id="openBrowse">只是想翻翻全部单词 →</button>
+    </div>
+  </section>
+
+  <!-- ============ 屏幕 2：背单词（百词斩式） ============ -->
+  <section id="screen-study" class="screen">
+    <div class="study-top">
+      <button class="study-exit" id="studyExit">← 选书</button>
+      <div class="study-title" id="studyTitle">小学</div>
+      <div class="study-count" id="studyCount">1 / 41</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="studyFill"></div></div>
+
+    <div class="study-scroll" id="studyScroll">
+      <!-- 单词卡 -->
+      <div class="study-card">
+        <div class="sc-head">
+          <div>
+            <div class="sc-word" id="scWord">apple</div>
+            <div class="sc-phon" id="scPhon">/ˈæp.əl/</div>
+          </div>
+          <button class="speak-btn big" id="scSpeak" aria-label="发音">🔊</button>
         </div>
+        <div class="sc-pos" id="scPos">n.</div>
+        <div class="sc-en" id="scEn"></div>
+        <div class="sc-example" id="scExample"></div>
+      </div>
+
+      <!-- 选择题 -->
+      <div class="quiz" id="quiz">
+        <div class="quiz-q" id="quizQ">这个单词是什么意思？</div>
+        <div class="quiz-options" id="quizOptions"></div>
+        <div class="quiz-hint" id="quizHint">想想意思，选一个 👆</div>
+      </div>
+
+      <!-- 揭晓 + 自评 -->
+      <div class="reveal" id="reveal" hidden>
+        <div class="reveal-head">
+          <div>
+            <div class="reveal-word" id="revealWord"></div>
+            <div class="reveal-phon" id="revealPhon"></div>
+          </div>
+          <button class="speak-btn" id="revealSpeak" aria-label="发音">🔊</button>
+        </div>
+        <div class="reveal-cn" id="revealCn"></div>
+
+        <div class="reveal-section"><h3>例句</h3><div id="revealExamples"></div></div>
+        <div class="reveal-section"><h3>同义词</h3><div class="chips" id="revealSyn"></div></div>
+        <div class="reveal-section"><h3>反义词</h3><div class="chips" id="revealAnt"></div></div>
+        <div class="reveal-section"><h3>用法</h3><div class="usage" id="revealUsage"></div></div>
+
+        <div class="self-assess">
+          <button class="sa sa-known" id="btnKnown">认识了 ✓</button>
+          <button class="sa sa-unknown" id="btnUnknown">没记住 ✗</button>
+        </div>
+        <button class="next-btn" id="btnNext">下一个 →</button>
       </div>
     </div>
-  </header>
+  </section>
 
-  <main class="layout">
-    <!-- 左栏：单词本选择 + 可滚动单词列表 -->
-    <section class="books-pane">
-      <div class="books" id="bookChips"></div>
-      <div class="search-row">
-        <input type="search" id="searchInput" placeholder="搜索单词或中文释义…" />
+  <!-- ============ 屏幕 3：结算 ============ -->
+  <section id="screen-summary" class="screen">
+    <div class="summary-card">
+      <div class="summary-emoji">🎉</div>
+      <h2>这一轮背完啦</h2>
+      <p class="summary-sub" id="summarySub">小学 · 41 词</p>
+      <div class="summary-stats">
+        <div class="ss known"><b id="sumKnown">0</b><span>认识了</span></div>
+        <div class="ss unknown"><b id="sumUnknown">0</b><span>没记住</span></div>
+        <div class="ss skip"><b id="sumSkip">0</b><span>跳过</span></div>
       </div>
-      <div class="list-meta" id="listMeta"></div>
-      <ul class="word-list" id="wordList"></ul>
-    </section>
+      <div class="summary-actions">
+        <button class="btn-primary" id="sumAgain">再背一轮</button>
+        <button class="btn-ghost" id="sumReviewWrong">只背没记住的</button>
+        <button class="btn-line" id="sumBack">返回选书</button>
+      </div>
+    </div>
+  </section>
 
-    <!-- 右栏：可滚动单词详情页 -->
-    <section class="detail-pane" id="detailPane">
-      <button class="back-btn" id="backBtn">← 返回列表</button>
-      <div class="detail-scroll" id="detailScroll">
-        <div class="d-empty" id="dEmpty">
-          <p>← 从左侧选择一个单词查看详情</p>
-          <p class="sub">支持选单词本、搜索、收藏 / 标记掌握 / 待复习。</p>
+  <!-- ============ 屏幕 4：浏览全部单词（旧模式，可选） ============ -->
+  <section id="screen-browse" class="screen">
+    <header class="books-top browse-top">
+      <button class="study-exit" id="browseExit">← 选书</button>
+      <div class="brand-text"><strong>浏览单词</strong><small>翻看全部 · 点开看详情</small></div>
+    </header>
+    <div class="browse-layout">
+      <section class="books-pane">
+        <div class="books" id="bookChips"></div>
+        <div class="search-row">
+          <input type="search" id="searchInput" placeholder="搜索单词或中文释义…" />
         </div>
-
-        <div class="d-body" id="dBody" hidden>
-          <div class="d-head">
-            <div>
-              <div class="d-word" id="dWord"></div>
-              <div class="d-phon" id="dPhon"></div>
+        <div class="list-meta" id="listMeta"></div>
+        <ul class="word-list" id="wordList"></ul>
+      </section>
+      <section class="detail-pane" id="detailPane">
+        <button class="back-btn" id="backBtn">← 返回列表</button>
+        <div class="detail-scroll" id="detailScroll">
+          <div class="d-empty" id="dEmpty">
+            <p>← 从左侧选择一个单词查看详情</p>
+            <p class="sub">支持选单词本、搜索、收藏 / 标记掌握 / 待复习。</p>
+          </div>
+          <div class="d-body" id="dBody" hidden>
+            <div class="d-head">
+              <div>
+                <div class="d-word" id="dWord"></div>
+                <div class="d-phon" id="dPhon"></div>
+              </div>
+              <button class="speak-btn big" id="dSpeak" aria-label="发音">🔊</button>
             </div>
-            <button class="speak-btn big" id="dSpeak" aria-label="发音">🔊</button>
-          </div>
-          <div class="d-level" id="dLevel"></div>
-          <div class="d-cn" id="dCn"></div>
-          <div class="d-en" id="dEn"></div>
-
-          <div class="d-section">
-            <h3>例句</h3>
-            <div class="examples" id="dExamples"></div>
-          </div>
-          <div class="d-section">
-            <h3>同义词</h3>
-            <div class="chips" id="dSyn"></div>
-          </div>
-          <div class="d-section">
-            <h3>反义词</h3>
-            <div class="chips" id="dAnt"></div>
-          </div>
-          <div class="d-section">
-            <h3>用法</h3>
-            <div class="usage" id="dUsage"></div>
-          </div>
-
-          <div class="d-actions">
-            <button class="btn" id="dPrev">← 上一个</button>
-            <button class="btn" id="dNext">下一个 →</button>
-            <button class="btn btn-fav" id="dFav">☆ 收藏</button>
-            <button class="btn btn-master" id="dMaster">✓ 已掌握</button>
-            <button class="btn btn-review" id="dReview">↺ 待复习</button>
+            <div class="d-level" id="dLevel"></div>
+            <div class="d-cn" id="dCn"></div>
+            <div class="d-en" id="dEn"></div>
+            <div class="d-section"><h3>例句</h3><div class="examples" id="dExamples"></div></div>
+            <div class="d-section"><h3>同义词</h3><div class="chips" id="dSyn"></div></div>
+            <div class="d-section"><h3>反义词</h3><div class="chips" id="dAnt"></div></div>
+            <div class="d-section"><h3>用法</h3><div class="usage" id="dUsage"></div></div>
+            <div class="d-actions">
+              <button class="btn" id="dPrev">← 上一个</button>
+              <button class="btn" id="dNext">下一个 →</button>
+              <button class="btn btn-fav" id="dFav">☆ 收藏</button>
+              <button class="btn btn-master" id="dMaster">✓ 已掌握</button>
+              <button class="btn btn-review" id="dReview">↺ 待复习</button>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
-  </main>
+      </section>
+    </div>
+  </section>
 
   <script src="./assets/js/app.js"></script>
 </body>
