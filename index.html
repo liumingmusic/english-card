@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="./assets/css/style.css" />
 </head>
 <body>
-  <!-- ============ 屏幕 1：选单词本 ============ -->
+  <!-- ============ 屏幕 1：选单词本 / 今日 ============ -->
   <section id="screen-books" class="screen active">
     <header class="books-top">
       <div class="brand">
@@ -26,15 +26,37 @@
       </div>
     </header>
 
-    <div class="books-head">
-      <h1>选择单词本</h1>
-      <p>点一本就开始背，看图记词 + 多题型自测，像百词斩那样一个一个过。</p>
+    <!-- 今日面板（已选单词本时显示） -->
+    <div id="todayPanel" class="today-panel" hidden>
+      <div class="today-card">
+        <div class="today-top">
+          <div class="today-book">📚 <b id="todayBook">小学</b></div>
+          <button class="today-change" id="todayChange">切换单词本</button>
+        </div>
+        <div class="today-plan">今日计划背 <b id="todayPlan">20</b> 个单词</div>
+        <div class="today-bar"><div class="today-bar-fill" id="todayFill"></div></div>
+        <div class="today-meta">今日已背 <b id="todayDone">0</b> / <b id="todayGoal">20</b> 个</div>
+        <div class="today-status" id="todayStatus"></div>
+        <button class="today-start" id="todayStart">开始背单词 →</button>
+      </div>
+      <div class="daily-setter">
+        <span class="daily-label">每日计划</span>
+        <div class="daily-chips" id="dailyChips"></div>
+      </div>
     </div>
 
-    <div class="book-grid" id="bookGrid"></div>
+    <!-- 选书面板（未选单词本时显示） -->
+    <div id="selectPanel">
+      <div class="books-head">
+        <h1 id="booksTitle">请选择单词本</h1>
+        <p id="booksSub">选一本就开始背，每天进步一点点 🌱</p>
+      </div>
 
-    <div class="books-foot">
-      <button class="link-btn" id="openBrowse">只是想翻翻全部单词 →</button>
+      <div class="book-grid" id="bookGrid"></div>
+
+      <div class="books-foot">
+        <button class="link-btn" id="openBrowse">只是想翻翻全部单词 →</button>
+      </div>
     </div>
   </section>
 
@@ -115,6 +137,7 @@
       <div class="summary-emoji">🎉</div>
       <h2>这一轮背完啦</h2>
       <p class="summary-sub" id="summarySub">小学 · 41 词</p>
+      <p class="summary-daily" id="summaryDaily"></p>
       <div class="summary-stats">
         <div class="ss known"><b id="sumKnown">0</b><span>认识了</span></div>
         <div class="ss unknown"><b id="sumUnknown">0</b><span>没记住</span></div>

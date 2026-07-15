@@ -76,6 +76,39 @@
   }
   function labelFor(key) { const b = BOOKS.find((x) => x.key === key); return b ? b.label : key; }
 
+  /* ---------- 每日计划 / 已选单词本（持久化） ---------- */
+  const LS_DAILY = "ec_daily", LS_BOOK = "ec_book";
+  const LS_DAILY_DATE = "ec_daily_date", LS_DAILY_DONE = "ec_daily_done";
+  function getSavedBook() { try { return localStorage.getItem(LS_BOOK) || ""; } catch (e) { return ""; } }
+  function setSavedBook(k) { try { if (k) localStorage.setItem(LS_BOOK, k); else localStorage.removeItem(LS_BOOK); } catch (e) {} }
+  function getDailyGoal() { try { return parseInt(localStorage.getItem(LS_DAILY), 10) || 20; } catch (e) { return 20; } }
+  function setDailyGoal(n) {
+    try { localStorage.setItem(LS_DAILY, String(n)); } catch (e) {}
+    renderDailyChips(n); refreshTodayStats();
+  }
+  function todayKey() {
+    const d = new Date(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+  function getTodayState() {
+    let date, done = 0;
+    try {
+      date = localStorage.getItem(LS_DAILY_DATE);
+      done = parseInt(localStorage.getItem(LS_DAILY_DONE), 10) || 0;
+    } catch (e) { date = ""; }
+    if (date !== todayKey()) {
+      // 新的一天，重置当日已背计数
+      try { localStorage.setItem(LS_DAILY_DATE, todayKey()); localStorage.setItem(LS_DAILY_DONE, "0"); } catch (e) {}
+      return { date: todayKey(), done: 0 };
+    }
+    return { date, done };
+  }
+  function recordStudied() {
+    const t = getTodayState();
+    try { localStorage.setItem(LS_DAILY_DONE, String(t.done + 1)); } catch (e) {}
+    refreshTodayStats();
+  }
+
   function normalize(w) {
     const examples = [];
     if (Array.isArray(w.examples) && w.examples.length) {
@@ -149,10 +182,95 @@
         `<span class="bc-count">${list.length} 词</span></div>` +
         `<div class="bc-bar"><div class="bc-bar-fill" style="width:${pct}%"></div></div>` +
         `<div class="bc-sub">已掌握 ${mastered}</div>` +
-        `<div class="bc-start">开始背单词 →</div>`;
-      card.addEventListener("click", () => startStudy(b.key, {}));
+        `<div class="bc-start">选这本 📖</div>`;
+      card.addEventListener("click", () => {
+        setSavedBook(b.key);
+        if (!localStorage.getItem(LS_DAILY)) { try { localStorage.setItem(LS_DAILY, "20"); } catch (e) {} }
+        show("books"); renderHome();
+      });
       grid.appendChild(card);
     });
+  }
+
+  function renderDailyChips(current) {
+    const box = $("dailyChips");
+    if (!box) return;
+    box.innerHTML = "";
+    [10, 20, 30, 50].forEach((n) => {
+      const b = document.createElement("button");
+      b.className = "daily-chip" + (n === current ? " active" : "");
+      b.textContent = n + " 个";
+      b.addEventListener("click", () => setDailyGoal(n));
+      box.appendChild(b);
+    });
+  }
+
+  function refreshTodayStats() {
+    const goal = getDailyGoal();
+    const t = getTodayState();
+    const done = Math.min(t.done, goal);
+    if ($("todayPlan")) $("todayPlan").textContent = goal;
+    if ($("todayGoal")) $("todayGoal").textContent = goal;
+    if ($("todayDone")) $("todayDone").textContent = done;
+    if ($("todayFill")) $("todayFill").style.width = Math.min(100, (done / goal) * 100) + "%";
+    const st = $("todayStatus");
+    if (st) {
+      if (t.done >= goal) { st.className = "today-status done"; st.textContent = "✅ 今天已经背完啦，明天再战！"; }
+      else {
+        const left = goal - t.done;
+        st.className = "today-status todo";
+        st.textContent = "今天还差 " + left + " 个单词没背完，加油 💪";
+      }
+    }
+  }
+
+  function renderHome() {
+    const book = getSavedBook();
+    if (book) {
+      $("todayPanel").hidden = false;
+      $("selectPanel").hidden = true;
+      $("todayBook").textContent = labelFor(book);
+      renderDailyChips(getDailyGoal());
+      refreshTodayStats();
+    } else {
+      $("todayPanel").hidden = true;
+      $("selectPanel").hidden = false;
+      $("booksTitle").textContent = "请选择单词本";
+      $("booksSub").textContent = "选一本就开始背，每天进步一点点 🌱";
+      renderBookCards();
+    }
+  }
+
+  function showSelect() {
+    $("todayPanel").hidden = true;
+    $("selectPanel").hidden = false;
+    $("booksTitle").textContent = "请选择单词本";
+    $("booksSub").textContent = "选一本就开始背，每天进步一点点 🌱";
+    renderBookCards();
+  }
+
+  function startDailyStudy() {
+    const book = getSavedBook();
+    if (!book) { showSelect(); return; }
+    const goal = getDailyGoal();
+    const t = getTodayState();
+    const remaining = Math.max(0, goal - t.done);
+    let list = getBookWords(book, "");
+    if (!list.length) { alert("这个单词本里还没有单词，换一本吧～"); return; }
+    const unmastered = list.filter((w) => !inSet(LS.mastered, w.word));
+    let chosen = unmastered.length ? unmastered : list;
+    if (remaining > 0) {
+      if (chosen.length > remaining) chosen = chosen.slice(0, remaining);
+    } else if (chosen.length > goal) {
+      chosen = chosen.slice(0, goal); // 今日已达标，额外复习一轮
+    }
+    state.session = {
+      bookKey: book, bookLabel: labelFor(book),
+      list: chosen, idx: 0, answered: false, quiz: null, current: null,
+      known: [], unknown: [], skip: 0,
+    };
+    show("study");
+    renderStudy();
   }
 
   /* ============================================================
@@ -339,6 +457,7 @@
   }
 
   function renderReveal(w) {
+    recordStudied();
     $("revealImg").innerHTML = w.img ? `<img src="${esc(w.img)}" alt="${esc(w.word)}">` : "";
     $("revealImg").classList.toggle("has", !!w.img);
     $("revealWord").textContent = w.word;
@@ -392,6 +511,8 @@
     const s = state.session;
     show("summary");
     $("summarySub").textContent = s.bookLabel + " · " + s.list.length + " 词";
+    const t = getTodayState();
+    $("summaryDaily").textContent = "今日进度 " + Math.min(t.done, getDailyGoal()) + " / " + getDailyGoal() + " 个";
     $("sumKnown").textContent = s.known.length;
     $("sumUnknown").textContent = s.unknown.length;
     $("sumSkip").textContent = s.skip;
@@ -506,7 +627,9 @@
   /* ---------- events ---------- */
   function bind() {
     $("openBrowse").addEventListener("click", () => { show("browse"); renderBookChips(); selectFirstOfBook(); updateProgress(); });
-    $("studyExit").addEventListener("click", () => { show("books"); renderBookCards(); updateProgress(); });
+    $("studyExit").addEventListener("click", () => { show("books"); renderHome(); updateProgress(); });
+    $("todayStart").addEventListener("click", () => startDailyStudy());
+    $("todayChange").addEventListener("click", () => showSelect());
     $("scSpeak").addEventListener("click", () => { if (state.session) speak(state.session.current.word, state.session.current.audio); });
     $("revealSpeak").addEventListener("click", () => { if (state.session) speak(state.session.current.word, state.session.current.audio); });
     $("quizOptions").addEventListener("click", onQuizClick);
@@ -515,10 +638,10 @@
     $("btnKnown").addEventListener("click", () => assess(true));
     $("btnUnknown").addEventListener("click", () => assess(false));
     $("btnNext").addEventListener("click", () => { if (state.session) { state.session.skip++; nextWord(); } });
-    $("sumAgain").addEventListener("click", () => startStudy(state.session.bookKey, {}));
+    $("sumAgain").addEventListener("click", () => startDailyStudy());
     $("sumReviewWrong").addEventListener("click", () => startStudy(state.session.bookKey, { onlyReview: true }));
-    $("sumBack").addEventListener("click", () => { show("books"); renderBookCards(); updateProgress(); });
-    $("browseExit").addEventListener("click", () => { show("books"); renderBookCards(); updateProgress(); });
+    $("sumBack").addEventListener("click", () => { show("books"); renderHome(); updateProgress(); });
+    $("browseExit").addEventListener("click", () => { show("books"); renderHome(); updateProgress(); });
     $("dSpeak").addEventListener("click", () => { if (state.current) speak(state.current.word, state.current.audio); });
     $("dPrev").addEventListener("click", () => step(-1));
     $("dNext").addEventListener("click", () => step(1));
@@ -548,8 +671,8 @@
     state.words = (await loadJSON("./data/words.json")) || [];
     state.words.forEach((w) => { state.byWord[w.word.toLowerCase()] = w; });
     updateProgress();
-    renderBookCards();
     show("books");
+    renderHome();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
