@@ -217,6 +217,30 @@ button { font-family: inherit; }
 }
 .next-btn:active { transform: translateY(1px); }
 
+/* 学习工具条：斩掉 / 跳过 */
+.study-tools { display: flex; gap: 12px; margin-top: 22px; }
+.study-tools[hidden] { display: none; }
+.tool-btn {
+  flex: 1; border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 14px; padding: 14px; font-size: 15px; font-weight: 800; cursor: pointer; transition: .12s;
+}
+.tool-btn:active { transform: translateY(1px); }
+.tool-skip { color: var(--muted); }
+.tool-skip:hover { border-color: var(--muted); color: var(--ink); }
+.tool-cut { color: var(--master); border-color: #bfe9d6; background: #e7f8f0; }
+.tool-cut:hover { background: #d6f3e8; }
+
+/* 收藏按钮 */
+.fav-btn.active { color: var(--fav); background: #fff4e0; border-color: var(--fav); }
+
+/* 例句卡片优化（左对齐 + 引号点缀） */
+#screen-study { background: linear-gradient(180deg, #eef3ff 0%, #f6f8ff 38%, #f6f8ff 100%); }
+.reveal .ex, .d-section .ex { position: relative; padding-left: 26px; }
+.reveal .ex::before, .d-section .ex::before {
+  content: "\201C"; position: absolute; left: 8px; top: 0; font-size: 24px;
+  color: var(--brand); opacity: .35; font-family: Georgia, "Times New Roman", serif; line-height: 1.1;
+}
+
 /* ===== summary ===== */
 #screen-summary.active { display: grid; place-items: center; padding: 20px; }
 .summary-card {

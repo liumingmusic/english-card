@@ -104,6 +104,12 @@
           <div class="quiz-hint" id="quizHint">想想意思，选一个 👆</div>
         </div>
 
+        <!-- 工具：斩掉 / 跳过（答题前可用） -->
+        <div class="study-tools" id="studyTools">
+          <button class="tool-btn tool-skip" id="btnSkipCard">跳过 ⏭️</button>
+          <button class="tool-btn tool-cut" id="btnCut">🙂 斩掉 · 认识</button>
+        </div>
+
         <!-- 揭晓 + 自评 -->
         <div class="reveal" id="reveal" hidden>
           <div class="reveal-img" id="revealImg"></div>
@@ -113,6 +119,7 @@
               <div class="reveal-phon" id="revealPhon"></div>
             </div>
             <button class="speak-btn" id="revealSpeak" aria-label="发音">🔊</button>
+            <button class="speak-btn fav-btn" id="revealFav" aria-label="收藏">☆</button>
           </div>
           <div class="reveal-cn" id="revealCn"></div>
 
@@ -146,7 +153,7 @@
       <div class="summary-actions">
         <button class="btn-primary" id="sumAgain">再背一轮</button>
         <button class="btn-ghost" id="sumReviewWrong">只背没记住的</button>
-        <button class="btn-line" id="sumBack">返回选书</button>
+        <button class="btn-line" id="sumBack">返回首页</button>
       </div>
     </div>
   </section>

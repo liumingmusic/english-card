@@ -328,6 +328,7 @@
     s.answered = false;
 
     $("studyTitle").textContent = s.bookLabel;
+    $("studyExit").textContent = getSavedBook() ? "← 退出" : "← 返回";
     $("studyCount").textContent = (s.idx + 1) + " / " + s.list.length;
     $("studyFill").style.width = (s.idx / s.list.length * 100) + "%";
 
@@ -405,6 +406,7 @@
     }
 
     $("reveal").hidden = true;
+    $("studyTools").hidden = false;
   }
 
   function onQuizClick(e) {
@@ -414,6 +416,7 @@
     const s = state.session;
     const i = +btn.dataset.i;
     s.answered = true;
+    $("studyTools").hidden = true;
     const opts = $("quizOptions").children;
     for (const o of opts) o.classList.add("locked");
     s.quiz.options.forEach((opt, idx) => {
@@ -431,6 +434,7 @@
     const s = state.session;
     if (!s || s.answered || s.quiz.mode !== "spell") return;
     s.answered = true;
+    $("studyTools").hidden = true;
     const raw = ($("spellInput").value || "").trim().toLowerCase().replace(/[.,!?;:。，！？；：]+$/g, "");
     const correct = raw === s.quiz.answer;
     $("spellInput").disabled = true;
@@ -458,6 +462,10 @@
 
   function renderReveal(w) {
     recordStudied();
+    const favOn = inSet(LS.fav, w.word);
+    const rf = $("revealFav");
+    rf.textContent = favOn ? "★" : "☆";
+    rf.classList.toggle("active", favOn);
     $("revealImg").innerHTML = w.img ? `<img src="${esc(w.img)}" alt="${esc(w.word)}">` : "";
     $("revealImg").classList.toggle("has", !!w.img);
     $("revealWord").textContent = w.word;
@@ -628,6 +636,24 @@
   function bind() {
     $("openBrowse").addEventListener("click", () => { show("browse"); renderBookChips(); selectFirstOfBook(); updateProgress(); });
     $("studyExit").addEventListener("click", () => { show("books"); renderHome(); updateProgress(); });
+    $("btnCut").addEventListener("click", () => {
+      const s = state.session; if (!s || s.answered) return;
+      const w = s.current; if (!w) return;
+      addSet(LS.mastered, w.word); removeSet(LS.review, w.word);
+      s.known.push(w.word); recordStudied(); updateProgress(); nextWord();
+    });
+    $("btnSkipCard").addEventListener("click", () => {
+      const s = state.session; if (!s || s.answered) return;
+      s.skip++; recordStudied(); nextWord();
+    });
+    $("revealFav").addEventListener("click", () => {
+      const w = state.session && state.session.current; if (!w) return;
+      toggleStatus(LS.fav);
+      const on = inSet(LS.fav, w.word);
+      const rf = $("revealFav");
+      rf.textContent = on ? "★" : "☆";
+      rf.classList.toggle("active", on);
+    });
     $("todayStart").addEventListener("click", () => startDailyStudy());
     $("todayChange").addEventListener("click", () => showSelect());
     $("scSpeak").addEventListener("click", () => { if (state.session) speak(state.session.current.word, state.session.current.audio); });
