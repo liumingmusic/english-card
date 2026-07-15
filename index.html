@@ -28,7 +28,7 @@
 
     <div class="books-head">
       <h1>选择单词本</h1>
-      <p>点一本就开始背，一个一个过，像百词斩那样做选择题自测。</p>
+      <p>点一本就开始背，看图记词 + 多题型自测，像百词斩那样一个一个过。</p>
     </div>
 
     <div class="book-grid" id="bookGrid"></div>
@@ -48,48 +48,63 @@
     <div class="progress-bar"><div class="progress-fill" id="studyFill"></div></div>
 
     <div class="study-scroll" id="studyScroll">
-      <!-- 单词卡 -->
       <div class="study-card">
-        <div class="sc-head">
-          <div>
-            <div class="sc-word" id="scWord">apple</div>
-            <div class="sc-phon" id="scPhon">/ˈæp.əl/</div>
+        <!-- 配图（百词斩式插图） -->
+        <div class="sc-img" id="scImg"></div>
+
+        <!-- 单词展示（看词选义时显示） -->
+        <div class="sc-learn" id="scLearn">
+          <div class="sc-head">
+            <div>
+              <div class="sc-word" id="scWord">apple</div>
+              <div class="sc-phon" id="scPhon">/ˈæp.əl/</div>
+            </div>
+            <button class="speak-btn big" id="scSpeak" aria-label="发音">🔊</button>
           </div>
-          <button class="speak-btn big" id="scSpeak" aria-label="发音">🔊</button>
+          <div class="sc-pos" id="scPos">n.</div>
+          <div class="sc-en" id="scEn"></div>
         </div>
-        <div class="sc-pos" id="scPos">n.</div>
-        <div class="sc-en" id="scEn"></div>
+
+        <!-- 例句（仅看词选义时显示，避免泄露答案） -->
         <div class="sc-example" id="scExample"></div>
-      </div>
 
-      <!-- 选择题 -->
-      <div class="quiz" id="quiz">
-        <div class="quiz-q" id="quizQ">这个单词是什么意思？</div>
-        <div class="quiz-options" id="quizOptions"></div>
-        <div class="quiz-hint" id="quizHint">想想意思，选一个 👆</div>
-      </div>
+        <!-- 题干（看义选词 / 听音时显示） -->
+        <div class="quiz-prompt" id="quizPrompt"></div>
 
-      <!-- 揭晓 + 自评 -->
-      <div class="reveal" id="reveal" hidden>
-        <div class="reveal-head">
-          <div>
-            <div class="reveal-word" id="revealWord"></div>
-            <div class="reveal-phon" id="revealPhon"></div>
+        <!-- 选择题 / 拼写 -->
+        <div class="quiz" id="quiz">
+          <div class="quiz-q" id="quizQ">这个单词是什么意思？</div>
+          <div class="quiz-options" id="quizOptions"></div>
+          <div class="quiz-spell" id="quizSpell" hidden>
+            <input id="spellInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文单词…" />
+            <button class="spell-check" id="spellCheck">确认</button>
           </div>
-          <button class="speak-btn" id="revealSpeak" aria-label="发音">🔊</button>
+          <div class="quiz-hint" id="quizHint">想想意思，选一个 👆</div>
         </div>
-        <div class="reveal-cn" id="revealCn"></div>
 
-        <div class="reveal-section"><h3>例句</h3><div id="revealExamples"></div></div>
-        <div class="reveal-section"><h3>同义词</h3><div class="chips" id="revealSyn"></div></div>
-        <div class="reveal-section"><h3>反义词</h3><div class="chips" id="revealAnt"></div></div>
-        <div class="reveal-section"><h3>用法</h3><div class="usage" id="revealUsage"></div></div>
+        <!-- 揭晓 + 自评 -->
+        <div class="reveal" id="reveal" hidden>
+          <div class="reveal-img" id="revealImg"></div>
+          <div class="reveal-head">
+            <div>
+              <div class="reveal-word" id="revealWord"></div>
+              <div class="reveal-phon" id="revealPhon"></div>
+            </div>
+            <button class="speak-btn" id="revealSpeak" aria-label="发音">🔊</button>
+          </div>
+          <div class="reveal-cn" id="revealCn"></div>
 
-        <div class="self-assess">
-          <button class="sa sa-known" id="btnKnown">认识了 ✓</button>
-          <button class="sa sa-unknown" id="btnUnknown">没记住 ✗</button>
+          <div class="reveal-section"><h3>例句</h3><div id="revealExamples"></div></div>
+          <div class="reveal-section"><h3>同义词</h3><div class="chips" id="revealSyn"></div></div>
+          <div class="reveal-section"><h3>反义词</h3><div class="chips" id="revealAnt"></div></div>
+          <div class="reveal-section"><h3>用法</h3><div class="usage" id="revealUsage"></div></div>
+
+          <div class="self-assess">
+            <button class="sa sa-known" id="btnKnown">认识了 ✓</button>
+            <button class="sa sa-unknown" id="btnUnknown">没记住 ✗</button>
+          </div>
+          <button class="next-btn" id="btnNext">下一个 →</button>
         </div>
-        <button class="next-btn" id="btnNext">下一个 →</button>
       </div>
     </div>
   </section>
@@ -136,6 +151,7 @@
             <p class="sub">支持选单词本、搜索、收藏 / 标记掌握 / 待复习。</p>
           </div>
           <div class="d-body" id="dBody" hidden>
+            <div class="d-img" id="dImg"></div>
             <div class="d-head">
               <div>
                 <div class="d-word" id="dWord"></div>

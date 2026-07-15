@@ -1,5 +1,6 @@
 /* 背单词软件 — 百词斩式背诵流（纯静态、零构建、无 API key、运行时零联网）。
-   词表全部内置在 data/words.json，前端只读本地 JSON。 */
+   词表全部内置在 data/words.json，前端只读本地 JSON。
+   特色：配图记忆（内置插图）+ 多题型自测（看词选义 / 看义选词 / 听音选义 / 拼写）。 */
 (function () {
   "use strict";
 
@@ -26,7 +27,6 @@
     byWord: {},
     screen: "books",
     session: null,
-    // browse 模式
     book: "ALL",
     filterText: "",
     current: null,
@@ -41,6 +41,7 @@
       $("screen-" + s).classList.toggle("active", s === screen);
     });
     window.scrollTo(0, 0);
+    const sc = $("studyScroll"); if (sc) sc.scrollTop = 0;
   }
   async function loadJSON(url) {
     try {
@@ -92,6 +93,7 @@
       synonyms: Array.isArray(w.synonyms) ? w.synonyms : [],
       antonyms: Array.isArray(w.antonyms) ? w.antonyms : [],
       usage: w.usage || "",
+      img: w.img || "",
     };
   }
 
@@ -125,7 +127,6 @@
     return arr;
   }
 
-  /* ---------- progress ---------- */
   function updateProgress() {
     $("masteredCount").textContent = lsGet(LS.mastered).length;
     $("favCount").textContent = lsGet(LS.fav).length;
@@ -155,29 +156,34 @@
   }
 
   /* ============================================================
-     屏幕 2：背单词（百词斩式）
+     屏幕 2：背单词（百词斩式：配图 + 多题型）
      ============================================================ */
   function buildQuiz(word, pool) {
-    // 干扰项来源：优先同本；不足 4 个词时用全词表
     const src = pool.length >= 4 ? pool : state.words;
+    const r = Math.random();
+    let mode;
+    if (r < 0.4) mode = "mean";        // 看词选义
+    else if (r < 0.7) mode = "word";   // 看义选词
+    else if (r < 0.9) mode = "listen"; // 听音选义
+    else mode = "spell";               // 拼写
+
+    if (mode === "spell") {
+      return { mode, q: "根据意思，把单词拼写出来 ✍️", answer: word.word.toLowerCase() };
+    }
+    const keyOf = (w) => (mode === "word" ? w.word : w.cn);
     const distractPool = shuffle(
-      src.filter((w) => w.word.toLowerCase() !== word.word.toLowerCase() && w.cn && w.cn.trim())
+      src.filter((w) => w.word.toLowerCase() !== word.word.toLowerCase() && keyOf(w) && keyOf(w).trim())
     );
-    const reverse = Math.random() < 0.5; // 一半概率出"看释义选单词"
     const taken = [];
-    const seen = new Set([reverse ? word.word : word.cn]);
+    const seen = new Set();
     for (const w of distractPool) {
-      const t = reverse ? w.word : w.cn;
+      const t = keyOf(w);
       if (!seen.has(t)) { seen.add(t); taken.push(t); }
       if (taken.length >= 3) break;
     }
-    if (reverse) {
-      const opts = shuffle([word.word, ...taken]).map((t) => ({ text: t, correct: t === word.word }));
-      return { type: "word", prompt: word.cn, q: "下面哪个是正确单词？", options: opts };
-    } else {
-      const opts = shuffle([word.cn, ...taken]).map((t) => ({ text: t, correct: t === word.cn }));
-      return { type: "meaning", prompt: word.word, q: "这个单词是什么意思？", options: opts };
-    }
+    const opts = shuffle([keyOf(word), ...taken]).map((t) => ({ text: t, correct: t === keyOf(word) }));
+    if (mode === "word") return { mode, prompt: word.cn, q: "下面哪个是正确单词？", options: opts };
+    return { mode, prompt: word.cn, q: mode === "listen" ? "听发音，选意思 🔊" : "这个单词是什么意思？", options: opts };
   }
 
   function startStudy(bookKey, opts) {
@@ -207,35 +213,86 @@
     $("studyCount").textContent = (s.idx + 1) + " / " + s.list.length;
     $("studyFill").style.width = (s.idx / s.list.length * 100) + "%";
 
-    $("scWord").textContent = w.word;
-    $("scPhon").textContent = w.phonetic || "（点 🔊 听发音）";
-    $("scPos").textContent = w.pos || "";
-    $("scEn").textContent = w.en || "";
-    const ex = w.examples && w.examples[0] ? w.examples[0] : null;
-    $("scExample").innerHTML = ex
-      ? `<div class="e-en">${esc(ex.en)}</div>` + (ex.cn ? `<div class="e-cn">${esc(ex.cn)}</div>` : "")
-      : "";
+    // 配图
+    const img = w.img || "";
+    $("scImg").innerHTML = img ? `<img src="${esc(img)}" alt="${esc(w.word)}">` : "";
+    $("scImg").classList.toggle("has", !!img);
 
     const quiz = buildQuiz(w, s.list);
     s.quiz = quiz;
-    $("quizQ").textContent = quiz.q;
+    const showWord = quiz.mode === "mean";
+
+    // 单词展示区
+    $("scLearn").style.display = showWord ? "" : "none";
+    if (showWord) {
+      $("scWord").textContent = w.word;
+      $("scPhon").textContent = w.phonetic || "（点 🔊 听发音）";
+      $("scPos").textContent = w.pos || "";
+      $("scEn").textContent = w.en || "";
+    }
+
+    // 例句：仅在看词选义时显示（其他题型例句含原词会泄露答案）
+    const ex = w.examples && w.examples[0] ? w.examples[0] : null;
+    $("scExample").style.display = showWord && ex ? "" : "none";
+    $("scExample").innerHTML = (showWord && ex)
+      ? `<div class="e-en">${esc(ex.en)}</div>` + (ex.cn ? `<div class="e-cn">${esc(ex.cn)}</div>` : "")
+      : "";
+
+    // 题干（看义选词 / 听音 / 拼写）
+    const qp = $("quizPrompt");
+    if (quiz.mode === "word") {
+      qp.innerHTML = `<div class="qp-meaning">${esc(w.cn)}</div>`;
+      qp.style.display = "";
+    } else if (quiz.mode === "listen") {
+      qp.innerHTML = `<button class="qp-speak" id="qpSpeak" aria-label="听发音">🔊</button><div class="qp-tip">点击播放，听发音选意思</div>`;
+      qp.style.display = "";
+    } else if (quiz.mode === "spell") {
+      qp.innerHTML = `<div class="qp-meaning">${esc(w.cn)}</div>`;
+      qp.style.display = "";
+    } else {
+      qp.style.display = "none"; qp.innerHTML = "";
+    }
+
+    // 选项 / 拼写输入
     const qo = $("quizOptions");
-    qo.innerHTML = "";
-    quiz.options.forEach((opt, i) => {
-      const b = document.createElement("button");
-      b.className = "quiz-opt";
-      b.dataset.i = String(i);
-      b.innerHTML = `<span class="qk">${String.fromCharCode(65 + i)}</span><span>${esc(opt.text)}</span>`;
-      qo.appendChild(b);
-    });
-    $("quizHint").textContent = "想想意思，选一个 👆";
+    const sp = $("quizSpell");
+    if (quiz.mode === "spell") {
+      qo.style.display = "none";
+      sp.hidden = false;
+      sp.classList.remove("spell-ok", "spell-bad");
+      $("spellInput").value = "";
+      $("spellInput").disabled = false;
+      $("spellCheck").disabled = false;
+      $("spellCheck").textContent = "确认";
+    } else {
+      sp.hidden = true;
+      qo.style.display = "";
+      $("quizQ").textContent = quiz.q;
+      qo.innerHTML = "";
+      quiz.options.forEach((opt, i) => {
+        const b = document.createElement("button");
+        b.className = "quiz-opt";
+        b.dataset.i = String(i);
+        b.innerHTML = `<span class="qk">${String.fromCharCode(65 + i)}</span><span>${esc(opt.text)}</span>`;
+        qo.appendChild(b);
+      });
+    }
+    $("quizHint").textContent = quiz.mode === "spell" ? "在下面拼写出这个单词 ✍️" : "想想意思，选一个 👆";
+
+    // 听音模式自动播放
+    if (quiz.mode === "listen") {
+      const qs = $("qpSpeak");
+      if (qs) qs.addEventListener("click", () => speak(w.word, w.audio));
+      setTimeout(() => speak(w.word, w.audio), 300);
+    }
+
     $("reveal").hidden = true;
-    const sc = $("studyScroll"); if (sc) sc.scrollTop = 0;
   }
 
   function onQuizClick(e) {
     const btn = e.target.closest(".quiz-opt");
     if (!btn || !state.session || state.session.answered) return;
+    if (state.session.quiz.mode === "spell") return;
     const s = state.session;
     const i = +btn.dataset.i;
     s.answered = true;
@@ -252,7 +309,38 @@
     $("reveal").hidden = false;
   }
 
+  function onSpellCheck() {
+    const s = state.session;
+    if (!s || s.answered || s.quiz.mode !== "spell") return;
+    s.answered = true;
+    const raw = ($("spellInput").value || "").trim().toLowerCase().replace(/[.,!?;:。，！？；：]+$/g, "");
+    const correct = raw === s.quiz.answer;
+    $("spellInput").disabled = true;
+    $("spellCheck").disabled = true;
+    $("quizSpell").classList.add(correct ? "spell-ok" : "spell-bad");
+    $("quizHint").textContent = correct ? "✅ 拼写正确！" : ("❌ 正确拼写：" + s.quiz.answer);
+    renderReveal(s.current);
+    $("reveal").hidden = false;
+  }
+
+  function renderChips(container, arr, emptyText) {
+    container.innerHTML = "";
+    if (arr && arr.length) {
+      arr.forEach((s) => {
+        const c = document.createElement("button");
+        c.className = "chip" + (state.byWord[s.toLowerCase()] ? " has-word" : "");
+        c.textContent = s;
+        c.addEventListener("click", () => speak(s, ""));
+        container.appendChild(c);
+      });
+    } else {
+      container.innerHTML = `<span class="chip empty-note">${emptyText}</span>`;
+    }
+  }
+
   function renderReveal(w) {
+    $("revealImg").innerHTML = w.img ? `<img src="${esc(w.img)}" alt="${esc(w.word)}">` : "";
+    $("revealImg").classList.toggle("has", !!w.img);
     $("revealWord").textContent = w.word;
     $("revealPhon").textContent = w.phonetic || "（点 🔊 听发音）";
     $("revealCn").textContent = w.cn || "—";
@@ -275,23 +363,6 @@
       const lv = LEVEL_LABEL[w.level] || w.level || "";
       us.innerHTML = `该词属于 <b>${esc(lv)}</b> 词表，词性 <b>${esc(w.pos || "—")}</b>。` +
         `中文释义：${esc(w.cn || "—")}。建议结合上方例句体会实际用法。`;
-    }
-  }
-
-  function renderChips(container, arr, emptyText) {
-    container.innerHTML = "";
-    if (arr && arr.length) {
-      arr.forEach((s) => {
-        const has = !!state.byWord[s.toLowerCase()];
-        const c = document.createElement("button");
-        c.className = "chip" + (has ? " has-word" : "");
-        c.textContent = s;
-        if (has) c.addEventListener("click", () => { speak(s, ""); });
-        else c.addEventListener("click", () => speak(s, ""));
-        container.appendChild(c);
-      });
-    } else {
-      container.innerHTML = `<span class="chip empty-note">${emptyText}</span>`;
     }
   }
 
@@ -368,6 +439,8 @@
     if (!w) return;
     $("dEmpty").hidden = true;
     $("dBody").hidden = false;
+    $("dImg").innerHTML = w.img ? `<img src="${esc(w.img)}" alt="${esc(w.word)}">` : "";
+    $("dImg").classList.toggle("has", !!w.img);
     $("dWord").textContent = w.word;
     $("dPhon").textContent = w.phonetic || "（音标缺失，点 🔊 用语音合成发音）";
     $("dLevel").textContent = LEVEL_LABEL[w.level] || w.level || "—";
@@ -432,21 +505,19 @@
 
   /* ---------- events ---------- */
   function bind() {
-    // books
     $("openBrowse").addEventListener("click", () => { show("browse"); renderBookChips(); selectFirstOfBook(); updateProgress(); });
-    // study
     $("studyExit").addEventListener("click", () => { show("books"); renderBookCards(); updateProgress(); });
     $("scSpeak").addEventListener("click", () => { if (state.session) speak(state.session.current.word, state.session.current.audio); });
     $("revealSpeak").addEventListener("click", () => { if (state.session) speak(state.session.current.word, state.session.current.audio); });
     $("quizOptions").addEventListener("click", onQuizClick);
+    $("spellCheck").addEventListener("click", onSpellCheck);
+    $("spellInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); onSpellCheck(); } });
     $("btnKnown").addEventListener("click", () => assess(true));
     $("btnUnknown").addEventListener("click", () => assess(false));
     $("btnNext").addEventListener("click", () => { if (state.session) { state.session.skip++; nextWord(); } });
-    // summary
     $("sumAgain").addEventListener("click", () => startStudy(state.session.bookKey, {}));
     $("sumReviewWrong").addEventListener("click", () => startStudy(state.session.bookKey, { onlyReview: true }));
     $("sumBack").addEventListener("click", () => { show("books"); renderBookCards(); updateProgress(); });
-    // browse
     $("browseExit").addEventListener("click", () => { show("books"); renderBookCards(); updateProgress(); });
     $("dSpeak").addEventListener("click", () => { if (state.current) speak(state.current.word, state.current.audio); });
     $("dPrev").addEventListener("click", () => step(-1));
@@ -462,7 +533,11 @@
         else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); step(-1); }
         else if (e.key === "Escape") document.body.classList.remove("show-detail");
       } else if (state.screen === "study") {
-        if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); if (state.session && state.session.answered) { state.session.skip++; nextWord(); } }
+        if (e.key === "ArrowRight" || e.key === " ") {
+          if (state.session && state.session.answered) { e.preventDefault(); state.session.skip++; nextWord(); }
+        } else if (e.key === "Enter" && state.session && state.session.quiz && state.session.quiz.mode === "spell" && !state.session.answered) {
+          e.preventDefault(); onSpellCheck();
+        }
       }
     });
   }
