@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#eef3ff" />
   <link rel="icon" href="data:," />
-  <title>每日英语单词卡片 · Daily Word</title>
+  <title>背单词 · Word Books</title>
   <link rel="stylesheet" href="./assets/css/style.css" />
 </head>
 <body>
@@ -14,148 +14,80 @@
       <div class="brand">
         <span class="brand-mark">A</span>
         <div class="brand-text">
-          <strong>每日单词</strong>
-          <small id="todayDate">—</small>
+          <strong>背单词</strong>
+          <small>选单词本 · 浏览全部 · 逐个攻克</small>
         </div>
       </div>
       <div class="topbar-right">
-        <span class="today-badge" id="todayBadge">今日单词</span>
         <div class="progress" title="学习进度">
-          <span>今日 <b id="learnedCount">0</b></span>
-          <span class="dot">·</span>
           <span>掌握 <b id="masteredCount">0</b></span>
+          <span class="dot">·</span>
+          <span>收藏 <b id="favCount">0</b></span>
         </div>
-        <button class="icon-btn menu-btn" id="menuBtn" aria-label="菜单">☰</button>
       </div>
     </div>
   </header>
 
   <main class="layout">
-    <!-- Card column -->
-    <section class="card-col">
-      <div class="card" id="card">
-        <div class="card-inner" id="cardInner">
-          <!-- front -->
-          <div class="face front">
-            <div class="corner-badges" id="cornerBadges"></div>
-            <div class="top-row">
-              <span class="level-tag" id="levelTag">CET4</span>
-              <button class="speak-btn" id="speakFront" aria-label="发音">🔊</button>
-            </div>
-            <div class="word" id="wordText">loading…</div>
-            <div class="phonetic" id="phoneticText"></div>
-            <div class="summary" id="summaryText"></div>
-            <div class="flip-hint">轻触卡片翻面 ↻</div>
-          </div>
-          <!-- back -->
-          <div class="face back">
-            <div class="corner-badges" id="cornerBadgesBack"></div>
-            <div class="back-head">
-              <span class="pos" id="posText"></span>
-              <button class="speak-btn small" id="speakBack" aria-label="发音">🔊</button>
-            </div>
-            <div class="meanings">
-              <div class="cn" id="cnText"></div>
-              <div class="en" id="enText"></div>
-            </div>
-            <div class="back-example" id="backExample"></div>
-            <div class="flip-hint">轻触返回 ↻</div>
-          </div>
-        </div>
+    <!-- 左栏：单词本选择 + 可滚动单词列表 -->
+    <section class="books-pane">
+      <div class="books" id="bookChips"></div>
+      <div class="search-row">
+        <input type="search" id="searchInput" placeholder="搜索单词或中文释义…" />
       </div>
-
-      <!-- Detail panel -->
-      <div class="detail" id="detail">
-        <div class="detail-tabs" id="detailTabs">
-          <button class="dtab active" data-tab="meaning">释义</button>
-          <button class="dtab" data-tab="examples">例句</button>
-          <button class="dtab" data-tab="syn">同义</button>
-          <button class="dtab" data-tab="ant">反义</button>
-          <button class="dtab" data-tab="usage">用法</button>
-        </div>
-        <div class="detail-body">
-          <div class="dpanel active" id="tab-meaning">
-            <div class="row"><span class="k">词性</span><span class="v" id="dPos"></span></div>
-            <div class="row"><span class="k">中文</span><span class="v" id="dCn"></span></div>
-            <div class="row"><span class="k">英文</span><span class="v" id="dEn"></span></div>
-          </div>
-          <div class="dpanel" id="tab-examples">
-            <div class="examples" id="dExamples"></div>
-          </div>
-          <div class="dpanel" id="tab-syn">
-            <div class="chips" id="dSyn"></div>
-          </div>
-          <div class="dpanel" id="tab-ant">
-            <div class="chips" id="dAnt"></div>
-          </div>
-          <div class="dpanel" id="tab-usage">
-            <div class="usage" id="dUsage"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn btn-primary" id="btnSpeak">🔊 发音</button>
-        <button class="btn" id="btnFlip">↻ 翻卡</button>
-        <button class="btn" id="btnNext">➡ 下一个</button>
-        <button class="btn btn-fav" id="btnFav">☆ 收藏</button>
-        <button class="btn btn-master" id="btnMaster">✓ 已掌握</button>
-        <button class="btn btn-review" id="btnReview">↺ 待复习</button>
-      </div>
-
-      <div class="modebar" id="modebar">
-        <button class="mode-pill active" data-mode="today">今日</button>
-        <button class="mode-pill" data-mode="review">复习</button>
-        <button class="mode-pill" data-mode="browse">词库</button>
-        <button class="mode-pill" data-mode="history">历史</button>
-      </div>
+      <div class="list-meta" id="listMeta"></div>
+      <ul class="word-list" id="wordList"></ul>
     </section>
 
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-head">
-        <h2 id="sideTitle">词库</h2>
-        <button class="icon-btn close-btn" id="closeBtn" aria-label="关闭">✕</button>
-      </div>
+    <!-- 右栏：可滚动单词详情页 -->
+    <section class="detail-pane" id="detailPane">
+      <button class="back-btn" id="backBtn">← 返回列表</button>
+      <div class="detail-scroll" id="detailScroll">
+        <div class="d-empty" id="dEmpty">
+          <p>← 从左侧选择一个单词查看详情</p>
+          <p class="sub">支持选单词本、搜索、收藏 / 标记掌握 / 待复习。</p>
+        </div>
 
-      <!-- browse panel -->
-      <div class="panel" id="panelBrowse">
-        <div class="filters">
-          <div class="levels" id="levelFilters">
-            <button class="lv active" data-level="ALL">全部</button>
-            <button class="lv" data-level="PRIMARY">小学</button>
-            <button class="lv" data-level="JUNIOR">初中</button>
-            <button class="lv" data-level="SENIOR">高中</button>
-            <button class="lv" data-level="CET4">四级</button>
-            <button class="lv" data-level="CET6">六级</button>
-            <button class="lv" data-level="KAOYAN">考研</button>
-            <button class="lv" data-level="IELTS">雅思</button>
+        <div class="d-body" id="dBody" hidden>
+          <div class="d-head">
+            <div>
+              <div class="d-word" id="dWord"></div>
+              <div class="d-phon" id="dPhon"></div>
+            </div>
+            <button class="speak-btn big" id="dSpeak" aria-label="发音">🔊</button>
           </div>
-          <input type="search" id="searchInput" placeholder="搜索单词或中文释义…" />
-        </div>
-        <div class="list-meta" id="listMeta"></div>
-        <ul class="word-list" id="wordList"></ul>
-      </div>
+          <div class="d-level" id="dLevel"></div>
+          <div class="d-cn" id="dCn"></div>
+          <div class="d-en" id="dEn"></div>
 
-      <!-- review panel -->
-      <div class="panel hidden" id="panelReview">
-        <p class="hint">仅循环「待复习」的单词。点击即可开始复习。</p>
-        <div class="review-tools">
-          <button class="btn btn-primary" id="btnStartReview">开始复习</button>
-          <span id="reviewStat" class="hint"></span>
-        </div>
-        <ul class="word-list" id="reviewList"></ul>
-      </div>
+          <div class="d-section">
+            <h3>例句</h3>
+            <div class="examples" id="dExamples"></div>
+          </div>
+          <div class="d-section">
+            <h3>同义词</h3>
+            <div class="chips" id="dSyn"></div>
+          </div>
+          <div class="d-section">
+            <h3>反义词</h3>
+            <div class="chips" id="dAnt"></div>
+          </div>
+          <div class="d-section">
+            <h3>用法</h3>
+            <div class="usage" id="dUsage"></div>
+          </div>
 
-      <!-- history panel -->
-      <div class="panel hidden" id="panelHistory">
-        <p class="hint">过去几天的「今日单词」，点选回看。</p>
-        <ul class="word-list" id="historyList"></ul>
+          <div class="d-actions">
+            <button class="btn" id="dPrev">← 上一个</button>
+            <button class="btn" id="dNext">下一个 →</button>
+            <button class="btn btn-fav" id="dFav">☆ 收藏</button>
+            <button class="btn btn-master" id="dMaster">✓ 已掌握</button>
+            <button class="btn btn-review" id="dReview">↺ 待复习</button>
+          </div>
+        </div>
       </div>
-    </aside>
+    </section>
   </main>
-
-  <div class="scrim" id="scrim"></div>
 
   <script src="./assets/js/app.js"></script>
 </body>
