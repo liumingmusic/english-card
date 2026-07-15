@@ -4,7 +4,7 @@
 (function () {
   "use strict";
 
-  const LS = { fav: "ec_fav", mastered: "ec_mastered", review: "ec_review" };
+  const LS = { fav: "ec_fav", mastered: "ec_mastered", review: "ec_review", studied: "ec_studied" };
   const LEVEL_LABEL = {
     PRIMARY: "小学", JUNIOR: "初中", SENIOR: "高中",
     CET4: "四级", CET6: "六级", KAOYAN: "考研", IELTS: "雅思",
@@ -103,7 +103,8 @@
     }
     return { date, done };
   }
-  function recordStudied() {
+  function recordStudied(word) {
+    if (word) addSet(LS.studied, word);
     const t = getTodayState();
     try { localStorage.setItem(LS_DAILY_DONE, String(t.done + 1)); } catch (e) {}
     refreshTodayStats();
@@ -222,6 +223,20 @@
         st.textContent = "今天还差 " + left + " 个单词没背完，加油 💪";
       }
     }
+    // 整本词书统计：总数 / 已背 / 还差 / 计划天数
+    const book = getSavedBook();
+    const bookList = book ? getBookWords(book, "") : [];
+    const total = bookList.length;
+    const studied = bookList.filter((w) => inSet(LS.studied, w.word)).length;
+    const leftBook = Math.max(0, total - studied);
+    const days = total ? Math.ceil(total / goal) : 0;
+    const pct = total ? Math.round((studied / total) * 100) : 0;
+    if ($("tsTotal")) $("tsTotal").textContent = total;
+    if ($("tsStudied")) $("tsStudied").textContent = studied;
+    if ($("tsLeft")) $("tsLeft").textContent = leftBook;
+    if ($("tsDays")) $("tsDays").textContent = days;
+    if ($("overallFill")) $("overallFill").style.width = pct + "%";
+    if ($("overallPct")) $("overallPct").textContent = pct + "%";
   }
 
   function renderHome() {
@@ -461,7 +476,7 @@
   }
 
   function renderReveal(w) {
-    recordStudied();
+    recordStudied(w.word);
     const favOn = inSet(LS.fav, w.word);
     const rf = $("revealFav");
     rf.textContent = favOn ? "★" : "☆";
@@ -640,11 +655,11 @@
       const s = state.session; if (!s || s.answered) return;
       const w = s.current; if (!w) return;
       addSet(LS.mastered, w.word); removeSet(LS.review, w.word);
-      s.known.push(w.word); recordStudied(); updateProgress(); nextWord();
+      s.known.push(w.word); recordStudied(w.word); updateProgress(); nextWord();
     });
     $("btnSkipCard").addEventListener("click", () => {
       const s = state.session; if (!s || s.answered) return;
-      s.skip++; recordStudied(); nextWord();
+      s.skip++; recordStudied(s.current.word); nextWord();
     });
     $("revealFav").addEventListener("click", () => {
       const w = state.session && state.session.current; if (!w) return;

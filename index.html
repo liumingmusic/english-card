@@ -36,6 +36,18 @@
         <div class="today-plan">今日计划背 <b id="todayPlan">20</b> 个单词</div>
         <div class="today-bar"><div class="today-bar-fill" id="todayFill"></div></div>
         <div class="today-meta">今日已背 <b id="todayDone">0</b> / <b id="todayGoal">20</b> 个</div>
+
+        <div class="today-stats">
+          <div class="ts"><b id="tsTotal">0</b><span>单词总数</span></div>
+          <div class="ts"><b id="tsStudied">0</b><span>已背</span></div>
+          <div class="ts"><b id="tsLeft">0</b><span>还差</span></div>
+          <div class="ts"><b id="tsDays">0</b><span>计划天数</span></div>
+        </div>
+        <div class="today-overall">
+          <div class="today-overall-bar"><div class="today-overall-fill" id="overallFill"></div></div>
+          <div class="today-overall-meta">本词书已学 <b id="overallPct">0%</b></div>
+        </div>
+
         <div class="today-status" id="todayStatus"></div>
         <button class="today-start" id="todayStart">开始背单词 →</button>
       </div>
@@ -123,7 +135,7 @@
           </div>
           <div class="reveal-cn" id="revealCn"></div>
 
-          <div class="reveal-section"><h3>例句</h3><div id="revealExamples"></div></div>
+          <div class="reveal-section"><h3>例句</h3><div class="examples" id="revealExamples"></div></div>
           <div class="reveal-section"><h3>同义词</h3><div class="chips" id="revealSyn"></div></div>
           <div class="reveal-section"><h3>反义词</h3><div class="chips" id="revealAnt"></div></div>
           <div class="reveal-section"><h3>用法</h3><div class="usage" id="revealUsage"></div></div>
