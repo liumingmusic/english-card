@@ -8,3 +8,6 @@ node_modules/
 
 # local scratch
 .tmp/
+
+# build cache (generated)
+scripts/.enrich_cache.json

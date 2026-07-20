@@ -1,65 +1,60 @@
 #!/usr/bin/env node
-// Build data/words.json from the curated seeds (scripts/seed.js + seed-school.js)
-// by enriching each entry with the Free Dictionary API: phonetic / audio / pos /
-// English definition / synonyms / antonyms / example sentences.
+// Build data/words.json from the curated seeds:
+//   scripts/seed-primary.js  (PRIMARY 小学)
+//   scripts/seed-junior.js   (JUNIOR 初中)
+//   scripts/seed-school.js   (SENIOR 高中)
+//   scripts/seed.js          (CET4 / CET6 / KAOYAN / IELTS)
+// Each entry is enriched at BUILD TIME with the Free Dictionary API for
+// phonetic / English meaning / synonyms / antonyms. We DO NOT store any remote
+// audio URL — the site uses the browser's local speechSynthesis for pronunciation,
+// so the published site is 100% offline (no runtime network calls).
 //
-// IMPORTANT: this runs at BUILD TIME only (local machine or CI). The published
-// site reads data/words.json directly — it never calls the API at runtime, so
-// the page loads fast and works fully offline. No API key is needed.
-// If the API is unreachable, the entry keeps the built-in fallback (cn / exampleCn /
-// usage) so the card never goes blank.
+// We also merge in data already present in the previous words.json (images,
+// bilingual examples) so we never lose work, and cache API results to .enrich_cache.json
+// so the build is resumable.
 const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-const SEED_A = require("./seed.js");
-const SEED_B = require("./seed-school.js");
 const OUT = path.join(ROOT, "data", "words.json");
+const CACHE = path.join(__dirname, ".enrich_cache.json");
 const API = (w) => `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`;
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function pickAudio(phonetics) {
-  if (!Array.isArray(phonetics)) return "";
-  for (const p of phonetics) {
-    if (p && p.audio && p.audio.startsWith("http")) return p.audio;
-  }
-  return "";
-}
+const SEED_PRIMARY = require("./seed-primary.js");
+const SEED_JUNIOR = require("./seed-junior.js");
+const SEED_SENIOR = require("./seed-school.js").filter((x) => x.level === "SENIOR");
+const SEED_CET = require("./seed.js");
+
+function loadCache() { try { return JSON.parse(fs.readFileSync(CACHE, "utf8")); } catch { return {}; } }
+function saveCache(c) { fs.writeFileSync(CACHE, JSON.stringify(c)); }
+
 function pickPhonetic(entry, phonetics) {
   if (entry && entry.phonetic) return entry.phonetic;
-  if (Array.isArray(phonetics)) {
-    for (const p of phonetics) if (p && p.text) return p.text;
-  }
+  if (Array.isArray(phonetics)) for (const p of phonetics) if (p && p.text) return p.text;
   return "";
 }
-
 async function fetchWord(word) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(API(word));
-      if (res.status === 429) { await sleep(900 * (attempt + 1)); continue; } // rate limited
-      if (!res.ok) return null; // 404 => word not in dictionary
+      if (res.status === 429) { await sleep(900 * (attempt + 1)); continue; }
+      if (!res.ok) return null;
       const data = await res.json();
       if (!Array.isArray(data) || !data.length) return null;
       return data;
-    } catch (e) {
-      await sleep(600);
-    }
+    } catch (e) { await sleep(600); }
   }
   return null;
 }
-
-async function parseApi(data) {
+function parseApi(data) {
   if (!Array.isArray(data) || !data.length) return null;
   const entry = data[0];
   const phonetics = entry.phonetics || [];
-  const audio = pickAudio(phonetics);
   const phonetic = pickPhonetic(entry, phonetics);
   const meanings = Array.isArray(entry.meanings) ? entry.meanings : [];
   const pos = meanings.length ? meanings[0].partOfSpeech || "" : "";
   let en = "";
-  const examples = [];
   const synSet = new Set();
   const antSet = new Set();
   for (const m of meanings) {
@@ -68,72 +63,94 @@ async function parseApi(data) {
     if (Array.isArray(m.synonyms)) m.synonyms.forEach((s) => s && synSet.add(s));
     if (Array.isArray(m.antonyms)) m.antonyms.forEach((s) => s && antSet.add(s));
     for (const d of defs) {
-      if (d.example && examples.length < 5) examples.push(d.example);
       if (Array.isArray(d.synonyms)) d.synonyms.forEach((s) => s && synSet.add(s));
       if (Array.isArray(d.antonyms)) d.antonyms.forEach((s) => s && antSet.add(s));
     }
   }
   return {
-    phonetic, audio, pos, en,
-    examples: examples.slice(0, 4),
+    phonetic, pos, en,
     synonyms: Array.from(synSet).slice(0, 8),
     antonyms: Array.from(antSet).slice(0, 8),
   };
 }
 
 async function main() {
-  // Merge both seeds, dedupe by lowercase word (keep first occurrence).
-  const SEED = SEED_A.concat(SEED_B);
+  const cache = loadCache();
+  // previous words.json (carry over img / bilingual examples / already-enriched fields)
+  let prev = [];
+  try { prev = JSON.parse(fs.readFileSync(OUT, "utf8")); } catch { prev = []; }
+  const prevMap = new Map();
+  prev.forEach((w) => prevMap.set(w.word.toLowerCase(), w));
+
+  const SEED = SEED_PRIMARY.concat(SEED_JUNIOR, SEED_SENIOR, SEED_CET);
   const seen = new Set();
   const unique = [];
   for (const s of SEED) {
-    const key = s.word.toLowerCase();
+    const key = s.word.toLowerCase().trim();
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(s);
   }
+
   const out = [];
-  let done = 0;
-  let ok = 0;
-  console.log(`Building words.json from ${unique.length} unique words (of ${SEED.length} seed entries)...`);
+  let done = 0, apiHits = 0, fromCache = 0, fromPrev = 0;
+  console.log(`Building words.json from ${unique.length} unique words...`);
 
   for (const seed of unique) {
+    const key = seed.word.toLowerCase().trim();
+    const old = prevMap.get(key) || {};
     let parsed = null;
-    const data = await fetchWord(seed.word);
-    if (data) parsed = await parseApi(data);
-    const examples = [];
-    if (parsed && parsed.examples.length) {
-      examples.push({ en: parsed.examples[0], cn: seed.exampleCn || "" });
-      parsed.examples.slice(1).forEach((en) => examples.push({ en, cn: "" }));
-    } else if (seed.exampleCn) {
-      examples.push({ en: "", cn: seed.exampleCn });
+
+    if (cache[key]) { parsed = cache[key]; fromCache++; }
+    else if (old.phonetic && old.en) {
+      // already enriched previously — reuse
+      parsed = { phonetic: old.phonetic, pos: old.pos || "", en: old.en, synonyms: old.synonyms || [], antonyms: old.antonyms || [] };
+      fromPrev++;
+    } else {
+      const data = await fetchWord(seed.word);
+      if (data) { parsed = parseApi(data); apiHits++; }
+      cache[key] = parsed || null;
+      saveCache(cache); // flush after every fetch so progress survives interruptions
     }
+
+    // examples: prefer previous bilingual examples, else seed Chinese example
+    let examples = Array.isArray(old.examples) && old.examples.length ? old.examples : [];
+    if (!examples.length && seed.exampleCn) examples = [{ en: "", cn: seed.exampleCn }];
+
     const entry = {
       word: seed.word,
       level: seed.level,
-      pos: (parsed && parsed.pos) || seed.pos || "",
-      phonetic: (parsed && parsed.phonetic) || "",
-      audio: (parsed && parsed.audio) || "",
-      cn: seed.cn || "",
-      en: (parsed && parsed.en) || seed.cn || "",
+      pos: (parsed && parsed.pos) || seed.pos || old.pos || "",
+      phonetic: (parsed && parsed.phonetic) || old.phonetic || "",
+      audio: "", // local TTS only — never store remote audio
+      cn: seed.cn || old.cn || "",
+      en: (parsed && parsed.en) || old.en || seed.cn || "",
       examples,
-      synonyms: (parsed && parsed.synonyms) || [],
-      antonyms: (parsed && parsed.antonyms) || [],
-      usage: seed.usage || "",
+      synonyms: (parsed && parsed.synonyms && parsed.synonyms.length) ? parsed.synonyms : (old.synonyms || []),
+      antonyms: (parsed && parsed.antonyms && parsed.antonyms.length) ? parsed.antonyms : (old.antonyms || []),
+      usage: seed.usage || old.usage || "",
+      img: old.img || "",
     };
-    if (parsed) ok++;
     out.push(entry);
     done++;
-    if (done % 25 === 0) console.log(`  ${done}/${unique.length} processed (api hits: ${ok})`);
-    await sleep(280); // pace to avoid rate limiting
+    // incremental durable checkpoint — survives being killed mid-build
+    if (done % 100 === 0) {
+      fs.writeFileSync(OUT, JSON.stringify(out));
+      console.log(`  [ckpt] ${done}/${unique.length} (api:${apiHits} cache:${fromCache} prev:${fromPrev})`);
+    }
+    if (!cache[key] && !old.phonetic) await sleep(80);
   }
+  saveCache(cache);
 
-  // stable sort: by level order then word
   const order = { PRIMARY: 0, JUNIOR: 1, SENIOR: 2, CET4: 3, CET6: 4, KAOYAN: 5, IELTS: 6 };
   out.sort((a, b) => (order[a.level] - order[b.level]) || a.word.localeCompare(b.word));
 
-  fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
-  console.log(`Wrote ${out.length} words to ${OUT} (API enriched: ${ok}, fallback: ${out.length - ok})`);
+  fs.writeFileSync(OUT, JSON.stringify(out));
+  // per-level counts
+  const lv = {};
+  out.forEach((w) => { lv[w.level] = (lv[w.level] || 0) + 1; });
+  console.log("Wrote", out.length, "words. Per level:", JSON.stringify(lv));
+  console.log(`(api:${apiHits} cache:${fromCache} prev-enriched:${fromPrev})`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

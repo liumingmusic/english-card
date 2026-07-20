@@ -186,6 +186,7 @@
         `<div class="bc-start">选这本 📖</div>`;
       card.addEventListener("click", () => {
         setSavedBook(b.key);
+        state.book = b.key; // keep browse filter in sync with the chosen book
         if (!localStorage.getItem(LS_DAILY)) { try { localStorage.setItem(LS_DAILY, "20"); } catch (e) {} }
         show("books"); renderHome();
       });
@@ -711,6 +712,8 @@
     bind();
     state.words = (await loadJSON("./data/words.json")) || [];
     state.words.forEach((w) => { state.byWord[w.word.toLowerCase()] = w; });
+    const saved = getSavedBook();
+    if (saved) state.book = saved; // returning user: browse defaults to their chosen book
     updateProgress();
     show("books");
     renderHome();
