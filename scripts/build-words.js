@@ -122,7 +122,9 @@ async function main() {
     const entry = {
       word: seed.word,
       level: seed.level,
-      pos: (parsed && parsed.pos) || seed.pos || old.pos || "",
+      // 种子词性优先：手写种子 pos 用简写(n./v./adj.)且经人工核对，比 Free Dictionary API 的
+      // partOfSpeech(常把 adj./adv./v. 一律返回成 noun) 准确得多，故 seed.pos 排在最前。
+      pos: seed.pos || (parsed && parsed.pos) || old.pos || "",
       phonetic: (parsed && parsed.phonetic) || old.phonetic || "",
       audio: "", // local TTS only — never store remote audio
       cn: seed.cn || old.cn || "",
