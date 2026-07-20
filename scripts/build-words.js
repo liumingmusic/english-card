@@ -22,7 +22,9 @@ const API = (w) => `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIC
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const SEED_PRIMARY = require("./seed-primary.js");
-const SEED_JUNIOR = require("./seed-junior.js");
+const SEED_JUNIOR = require("./seed-junior.js")
+  .concat(require("./seed-junior-extra.js"))
+  .concat(require("./seed-junior-extra2.js"));
 const SEED_SENIOR = require("./seed-school.js").filter((x) => x.level === "SENIOR");
 const SEED_CET = require("./seed.js");
 
@@ -151,6 +153,10 @@ async function main() {
   out.forEach((w) => { lv[w.level] = (lv[w.level] || 0) + 1; });
   console.log("Wrote", out.length, "words. Per level:", JSON.stringify(lv));
   console.log(`(api:${apiHits} cache:${fromCache} prev-enriched:${fromPrev})`);
+
+  // 应用手写双语例句，覆盖脏/缺失例句（幂等，重建不丢例句）
+  try { require("./primary-examples.js"); } catch (e) { console.error("primary-examples failed:", e.message); }
+  try { require("./junior-examples.js"); } catch (e) { console.error("junior-examples failed:", e.message); }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
